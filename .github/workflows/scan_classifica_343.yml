@@ -1,0 +1,51 @@
+name: Scan Classifica 343
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 */3 * *' # Ogni 3 giorni a mezzanotte
+
+jobs:
+  scan_and_push:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: |
+          pip install playwright requests
+          playwright install chromium --with-deps
+
+      # 1. ESEGUI LO SCANNER
+      - name: Run 343 Scanner
+        env:
+          # Questi secret vengono letti dalle impostazioni della Repo
+          LK_EMAIL: ${{ secrets.LK_EMAIL }}
+          LK_PASSWORD: ${{ secrets.LK_PASSWORD }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        # 🛠️ CAMBIA IL NOME FILE QUI SOTTO
+        run: python main_343.py
+
+      # 2. PUSH SU RE-PANZA/LK_DATABASE
+      - name: Push to Re-Panza/lk_database
+        env:
+          MY_PAT: ${{ secrets.PAT_GITHUB }}
+          TARGET_REPO: "Re-Panza/lk_database"
+          # 🛠️ CAMBIA IL NOME FILE JSON QUI SOTTO
+          FILE_NAME: "database_classificamondo343.json"
+        run: |
+          git clone https://x-access-token:${MY_PAT}@github.com/${{ env.TARGET_REPO }}.git db_dest
+          mv ${{ env.FILE_NAME }} db_dest/
+          cd db_dest
+          git config --global user.name "Re Panza Bot"
+          git config --global user.email "bot@repanza.it"
+          git add ${{ env.FILE_NAME }}
+          git diff --quiet && git diff --staged --quiet || (git commit -m "📊 Classifica 343 Update: $(date)" && git push)
